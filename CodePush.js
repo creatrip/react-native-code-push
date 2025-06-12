@@ -64,61 +64,68 @@ async function checkForUpdate(
    */
   const update = sharedCodePushOptions.updateChecker
     ? await (async () => {
-        /**
-         * UpdateCheckRequest 타입에 맞춰 요청 객체 생성
-         * CodePush SDK 내부 타입 참조
-         */
-        const updateRequest = {
-          deployment_key: config.deploymentKey,
-          app_version: queryPackage.appVersion,
-          package_hash: queryPackage.packageHash,
-          is_companion: config.ignoreAppVersion,
-          label: queryPackage.label,
-          client_unique_id: config.clientUniqueId,
-        };
-
-        // 커스텀 업데이트 체커 함수 호출
-        const response = await sharedCodePushOptions.updateChecker(
-          updateRequest
-        );
-
-        /**
-         * CodePush SDK 내부 처리 로직에서 추출한 응답 처리
-         * 업데이트 시나리오별 분기 처리
-         */
-        const updateInfo = response.update_info;
-
-        // 케이스 1: 업데이트 정보가 없음
-        if (!updateInfo) {
-          return null;
-        }
-        // 케이스 2: 바이너리(앱 스토어) 업데이트 필요
-        else if (updateInfo.update_app_version) {
-          return {
-            updateAppVersion: true,
-            appVersion: updateInfo.target_binary_range,
+        try {
+          /**
+           * UpdateCheckRequest 타입에 맞춰 요청 객체 생성
+           * CodePush SDK 내부 타입 참조
+           */
+          const updateRequest = {
+            deployment_key: config.deploymentKey,
+            app_version: queryPackage.appVersion,
+            package_hash: queryPackage.packageHash,
+            is_companion: config.ignoreAppVersion,
+            label: queryPackage.label,
+            client_unique_id: config.clientUniqueId,
           };
-        }
-        // 케이스 3: 업데이트가 있지만 사용 불가능
-        else if (!updateInfo.is_available) {
-          return null;
-        }
 
-        /**
-         * 케이스 4: 정상적인 CodePush 업데이트
-         * RemotePackage 타입 형식으로 변환 (CodePush SDK 내부 타입 참조)
-         * null 병합 연산자(??)로 기본값 처리
-         */
-        return {
-          deploymentKey: config.deploymentKey,
-          description: updateInfo.description ?? "",
-          label: updateInfo.label ?? "",
-          appVersion: updateInfo.target_binary_range ?? "",
-          isMandatory: updateInfo.is_mandatory ?? false,
-          packageHash: updateInfo.package_hash ?? "",
-          packageSize: updateInfo.package_size ?? 0,
-          downloadUrl: updateInfo.download_url ?? "",
-        };
+          // 커스텀 업데이트 체커 함수 호출
+          const response = await sharedCodePushOptions.updateChecker(
+            updateRequest
+          );
+
+          /**
+           * CodePush SDK 내부 처리 로직에서 추출한 응답 처리
+           * 업데이트 시나리오별 분기 처리
+           */
+          const updateInfo = response.update_info;
+
+          // 케이스 1: 업데이트 정보가 없음
+          if (!updateInfo) {
+            return null;
+          }
+          // 케이스 2: 바이너리(앱 스토어) 업데이트 필요
+          else if (updateInfo.update_app_version) {
+            return {
+              updateAppVersion: true,
+              appVersion: updateInfo.target_binary_range,
+            };
+          }
+          // 케이스 3: 업데이트가 있지만 사용 불가능
+          else if (!updateInfo.is_available) {
+            return null;
+          }
+
+          /**
+           * 케이스 4: 정상적인 CodePush 업데이트
+           * RemotePackage 타입 형식으로 변환 (CodePush SDK 내부 타입 참조)
+           * null 병합 연산자(??)로 기본값 처리
+           */
+          return {
+            deploymentKey: config.deploymentKey,
+            description: updateInfo.description ?? "",
+            label: updateInfo.label ?? "",
+            appVersion: updateInfo.target_binary_range ?? "",
+            isMandatory: updateInfo.is_mandatory ?? false,
+            packageHash: updateInfo.package_hash ?? "",
+            packageSize: updateInfo.package_size ?? 0,
+            downloadUrl: updateInfo.download_url ?? "",
+          };
+        } catch (error) {
+          log(`An error has occurred at update checker : ${error.stack}`);
+          if (sharedCodePushOptions.fallbackToAppCenter) {
+            return await sdk.queryUpdateWithCurrentPackage(queryPackage);
+          }
+        }
       })()
     : await sdk.queryUpdateWithCurrentPackage(queryPackage);
 
@@ -716,6 +723,8 @@ let CodePush;
  * @property {Function} setBundleHost - bundleHost 값을 설정하는 함수
  * @property {updateChecker|undefined} updateChecker - 커스텀 업데이트 확인 함수
  * @property {Function} setUpdateChecker - updateChecker 값을 설정하는 함수
+ * @property {boolean} fallbackToAppCenter - AppCenter로 폴백하는 옵션
+ * @property {Function} setFallbackToAppCenter - fallbackToAppCenter 값을 설정하는 함수
  */
 const sharedCodePushOptions = {
   bundleHost: undefined,
@@ -725,6 +734,10 @@ const sharedCodePushOptions = {
       throw new Error("pass a function to setUpdateChecker");
     }
     this.updateChecker = updateCheckerFunction;
+  },
+  fallbackToAppCenter: true,
+  setFallbackToAppCenter(enable) {
+    this.fallbackToAppCenter = enable;
   },
 };
 
@@ -754,6 +767,8 @@ function codePushify(options = {}) {
 
   sharedCodePushOptions.setBundleHost(options.bundleHost);
   sharedCodePushOptions.setUpdateChecker(options.updateChecker);
+  sharedCodePushOptions.setFallbackToAppCenter(options.fallbackToAppCenter);
+
 
   const decorator = (RootComponent) => {
     class CodePushComponent extends React.Component {

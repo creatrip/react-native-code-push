@@ -48,6 +48,10 @@ export interface CodePushOptions extends SyncOptions {
   updateChecker?: (
     updateRequest: UpdateCheckRequest
   ) => Promise<{ update_info: UpdateCheckResponse }>;
+  /**
+   * `updateChecker` 함수 실행 중 에러가 발생했을 때 AppCenter에 업데이트 원래 동작을 실행할지 지정합니다.
+   */
+  fallbackToAppCenter?: boolean;
 }
 
 export interface DownloadProgress {
