@@ -643,6 +643,10 @@ let CodePush;
 const sharedCodePushOptions = {
   bundleHost: undefined,
   setBundleHost(host) {
+    if (host && typeof host !== "string") {
+      throw new Error("setBundleHost에 문자열을 전달해주세요");
+    }
+
     if (typeof host === "string" && host.slice(-1) !== "/") {
       host += "/";
     }
