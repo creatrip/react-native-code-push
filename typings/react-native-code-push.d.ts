@@ -6,7 +6,7 @@ export type HandleBinaryVersionMismatchCallback = (
 
 // from code-push SDK
 export interface UpdateCheckRequest {
-  app_version: string;
+  app_version: string /** 네이티브 앱 버전입니다. package.json 버전이 아닙니다. */;
   client_unique_id?: string;
   deployment_key: string;
   is_companion?: boolean;
