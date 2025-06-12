@@ -55,7 +55,69 @@ async function checkForUpdate(
     }
   }
 
-  const update = await sdk.queryUpdateWithCurrentPackage(queryPackage);
+  /**
+   * 업데이트 확인 수행
+   * sharedCodePushOptions.updateChecker가 설정된 경우 커스텀 업데이트 체커를 사용하고, 그렇지 않으면 기본 SDK 사용
+   */
+  const update = sharedCodePushOptions.updateChecker
+    ? await (async () => {
+        /**
+         * UpdateCheckRequest 타입에 맞춰 요청 객체 생성
+         * CodePush SDK 내부 타입 참조
+         */
+        const updateRequest = {
+          deployment_key: config.deploymentKey,
+          app_version: queryPackage.appVersion,
+          package_hash: queryPackage.packageHash,
+          is_companion: config.ignoreAppVersion,
+          label: queryPackage.label,
+          client_unique_id: config.clientUniqueId,
+        };
+
+        // 커스텀 업데이트 체커 함수 호출
+        const response = await sharedCodePushOptions.updateChecker(
+          updateRequest
+        );
+
+        /**
+         * CodePush SDK 내부 처리 로직에서 추출한 응답 처리
+         * 업데이트 시나리오별 분기 처리
+         */
+        const updateInfo = response.update_info;
+
+        // 케이스 1: 업데이트 정보가 없음
+        if (!updateInfo) {
+          return null;
+        }
+        // 케이스 2: 바이너리(앱 스토어) 업데이트 필요
+        else if (updateInfo.update_app_version) {
+          return {
+            updateAppVersion: true,
+            appVersion: updateInfo.target_binary_range,
+          };
+        }
+        // 케이스 3: 업데이트가 있지만 사용 불가능
+        else if (!updateInfo.is_available) {
+          return null;
+        }
+
+        /**
+         * 케이스 4: 정상적인 CodePush 업데이트
+         * RemotePackage 타입 형식으로 변환 (CodePush SDK 내부 타입 참조)
+         * null 병합 연산자(??)로 기본값 처리
+         */
+        return {
+          deploymentKey: config.deploymentKey,
+          description: updateInfo.description ?? "",
+          label: updateInfo.label ?? "",
+          appVersion: updateInfo.target_binary_range ?? "",
+          isMandatory: updateInfo.is_mandatory ?? false,
+          packageHash: updateInfo.package_hash ?? "",
+          packageSize: updateInfo.package_size ?? 0,
+          downloadUrl: updateInfo.download_url ?? "",
+        };
+      })()
+    : await sdk.queryUpdateWithCurrentPackage(queryPackage);
 
   const fileName =
     update && typeof update.downloadUrl === "string"
@@ -637,20 +699,29 @@ async function syncInternal(
 let CodePush;
 
 /**
+ * 커스텀 업데이트 확인 콜백 함수 타입 정의
+ * @callback updateChecker
+ * @param {UpdateCheckRequest} updateRequest - 업데이트를 확인할 현재 패키지 정보
+ * @returns {Promise<{update_info: UpdateCheckResponse}>} 업데이트 확인 결과. AppCenter API 응답 인터페이스를 따릅니다.
+ */
+
+/**
+ * CodePush 공유 옵션 객체
  * `codePushify`를 호출할 때 옵션을 한 번 전달하면, 관련 함수들과 공유됩니다.
- * @type {{setBundleHost(host: string): void, bundleHost: string|undefined}}
+ * @type {Object}
+ * @property {string|undefined} bundleHost - 업데이트 파일의 위치를 지정합니다. http 스키마와 호스트를 포함해야 합니다.
+ * @property {Function} setBundleHost - bundleHost 값을 설정하는 함수
+ * @property {updateChecker|undefined} updateChecker - 커스텀 업데이트 확인 함수
+ * @property {Function} setUpdateChecker - updateChecker 값을 설정하는 함수
  */
 const sharedCodePushOptions = {
   bundleHost: undefined,
-  setBundleHost(host) {
-    if (host && typeof host !== "string") {
-      throw new Error("setBundleHost에 문자열을 전달해주세요");
+  updateChecker: undefined,
+  setUpdateChecker(updateCheckerFunction) {
+    if (updateCheckerFunction && typeof updateCheckerFunction !== "function") {
+      throw new Error("pass a function to setUpdateChecker");
     }
-
-    if (typeof host === "string" && host.slice(-1) !== "/") {
-      host += "/";
-    }
-    this.bundleHost = host;
+    this.updateChecker = updateCheckerFunction;
   },
 };
 
@@ -677,6 +748,9 @@ function codePushify(options = {}) {
 2. Call the codePush.sync API in your component instead of using the @codePush decorator`
     );
   }
+
+  sharedCodePushOptions.setBundleHost(options.bundleHost);
+  sharedCodePushOptions.setUpdateChecker(options.updateChecker);
 
   const decorator = (RootComponent) => {
     class CodePushComponent extends React.Component {

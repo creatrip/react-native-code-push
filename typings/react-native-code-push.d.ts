@@ -4,6 +4,31 @@ export type HandleBinaryVersionMismatchCallback = (
   update: RemotePackage
 ) => void;
 
+// from code-push SDK
+export interface UpdateCheckRequest {
+  app_version: string;
+  client_unique_id?: string;
+  deployment_key: string;
+  is_companion?: boolean;
+  label?: string;
+  package_hash?: string;
+}
+
+// from code-push SDK
+export interface UpdateCheckResponse {
+  download_url?: string;
+  description?: string;
+  is_available: boolean;
+  is_disabled?: boolean;
+  target_binary_range: string;
+  /*generated*/ label?: string;
+  /*generated*/ package_hash?: string;
+  package_size?: number;
+  should_run_binary_version?: boolean;
+  update_app_version?: boolean;
+  is_mandatory?: boolean;
+}
+
 export interface CodePushOptions extends SyncOptions {
   /**
    * Specifies when you would like to synchronize updates with the CodePush server.
@@ -15,6 +40,14 @@ export interface CodePushOptions extends SyncOptions {
    * 자체 호스팅에 사용됩니다.
    */
   bundleHost?: string;
+  /**
+   * 업데이트 확인을 수행할 함수를 지정합니다.
+   * 자체 호스팅에 사용할 수 있습니다.
+   * 기본값은 AppCenter update_check REST API 요청입니다.
+   */
+  updateChecker?: (
+    updateRequest: UpdateCheckRequest
+  ) => Promise<{ update_info: UpdateCheckResponse }>;
 }
 
 export interface DownloadProgress {
