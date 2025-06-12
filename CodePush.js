@@ -124,18 +124,23 @@ async function checkForUpdate(
           log(`An error has occurred at update checker : ${error.stack}`);
           if (sharedCodePushOptions.fallbackToAppCenter) {
             return await sdk.queryUpdateWithCurrentPackage(queryPackage);
+          } else {
+            // 업데이트가 실행되지 않습니다
+            return undefined;
           }
         }
       })()
     : await sdk.queryUpdateWithCurrentPackage(queryPackage);
 
-  const fileName =
-    update && typeof update.downloadUrl === "string"
-      ? update.downloadUrl.split("/").pop()
-      : null;
+  if (sharedCodePushOptions.bundleHost && update) {
+    const fileName =
+      typeof update.downloadUrl === "string"
+        ? update.downloadUrl.split("/").pop()
+        : null;
 
-  if (sharedCodePushOptions.bundleHost && fileName) {
-    update.downloadUrl = sharedCodePushOptions.bundleHost + fileName;
+    if (fileName) {
+      update.downloadUrl = sharedCodePushOptions.bundleHost + fileName;
+    }
   }
 
   /*
@@ -768,7 +773,6 @@ function codePushify(options = {}) {
   sharedCodePushOptions.setBundleHost(options.bundleHost);
   sharedCodePushOptions.setUpdateChecker(options.updateChecker);
   sharedCodePushOptions.setFallbackToAppCenter(options.fallbackToAppCenter);
-
 
   const decorator = (RootComponent) => {
     class CodePushComponent extends React.Component {
