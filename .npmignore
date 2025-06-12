@@ -48,6 +48,8 @@ android/.idea
 # Windows
 windows/.vs/
 windows/obj/
+windowsAdd commentMore actions
+windows-legacy
 
 #Tests
 windows/CodePush.Net46.Test
