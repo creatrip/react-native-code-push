@@ -13,21 +13,21 @@ async function checkForUpdate(
   handleBinaryVersionMismatchCallback = null
 ) {
   /*
-   * Before we ask the server if an update exists, we
-   * need to retrieve three pieces of information from the
-   * native side: deployment key, app version (e.g. 1.0.1)
-   * and the hash of the currently running update (if there is one).
-   * This allows the client to only receive updates which are targetted
-   * for their specific deployment and version and which are actually
-   * different from the CodePush update they have already installed.
+   * 서버에 업데이트 존재 여부를 확인하기 전에
+   * 네이티브 측에서 3가지 정보를 가져와야 합니다:
+   * 1. deployment key (배포 키)
+   * 2. app version (앱 버전, 예: 1.0.1)
+   * 3. 현재 실행 중인 업데이트의 해시 (있는 경우)
+   *
+   * 이를 통해 클라이언트는 자신의 특정 배포 환경과 버전에 맞는 업데이트만 받고,
+   * 이미 설치된 CodePush 업데이트와 실제로 다른 업데이트만 받을 수 있습니다.
    */
   const nativeConfig = await getConfiguration();
   /*
-   * If a deployment key was explicitly provided,
-   * then let's override the one we retrieved
-   * from the native-side of the app. This allows
-   * dynamically "redirecting" end-users at different
-   * deployments (e.g. an early access deployment for insiders).
+   * deployment key가 명시적으로 제공된 경우,
+   * 앱의 네이티브 측에서 가져온 키를 덮어씁니다.
+   * 이를 통해 최종 사용자를 다른 배포 환경으로 동적으로 "리디렉션"할 수 있습니다.
+   * (예: 내부자용 얼리 액세스 배포)
    */
   const config = deploymentKey
     ? { ...nativeConfig, ...{ deploymentKey } }
@@ -38,12 +38,15 @@ async function checkForUpdate(
   const localPackage = await module.exports.getCurrentPackage();
 
   /*
-   * If the app has a previously installed update, and that update
-   * was targetted at the same app version that is currently running,
-   * then we want to use its package hash to determine whether a new
-   * release has been made on the server. Otherwise, we only need
-   * to send the app version to the server, since we are interested
-   * in any updates for current binary version, regardless of hash.
+   * 업데이트 확인 시 서버에 보낼 정보를 결정하는 로직
+   *
+   * 케이스 1: 이전에 설치한 업데이트(localPackage)가 있는 경우
+   * - 기존 패키지 정보를 그대로 사용 (해시 포함)
+   * - 서버에서 "이 해시보다 새로운 업데이트가 있나?" 확인 가능
+   *
+   * 케이스 2: 이전 업데이트가 없는 경우
+   * - 앱 버전만 기본으로 전송
+   * - iOS의 경우 packageHash가 있으면 추가로 포함
    */
   let queryPackage;
   if (localPackage) {
