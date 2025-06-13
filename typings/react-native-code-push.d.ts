@@ -213,6 +213,15 @@ export interface SyncOptions {
    * one or more of the default values.
    */
   rollbackRetryOptions?: RollbackRetryOptions;
+
+  /**
+   * 설치에 실패한 경우 해당 업데이트를 무시할지 여부를 지정합니다.
+   * false로 설정하면 이전 설치 시도가 실패했더라도, sync 메서드가 호출될 때 업데이트를 다시 시도합니다.
+   * 단, 배포 전략에 따라 정상적으로 설치될 수 없는 업데이트가 배포된 경우,
+   * 이 옵션은 무한한 업데이트 재시도 루프를 유발할 수 있습니다.
+   * 기본값은 true입니다.
+   */
+  ignoreFailedUpdates?: boolean;
 }
 
 export interface UpdateDialog {
