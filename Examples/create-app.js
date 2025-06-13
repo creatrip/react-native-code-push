@@ -197,7 +197,7 @@ function setupAssets() {
 }
 
 function optimizeToTestInDebugMode() {
-    const rnXcodeShLocationFolder = 'scripts';
+    let rnXcodeShLocationFolder = 'scripts';
     try {
         const rnVersions = JSON.parse(execCommand(`npm view react-native versions --json`));
         const currentRNversion = JSON.parse(fs.readFileSync('./package.json'))['dependencies']['react-native'];
