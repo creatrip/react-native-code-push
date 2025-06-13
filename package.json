@@ -28,7 +28,8 @@
     "test:fast:ios": "mocha --recursive bin/test --ios",
     "test:debugger:android": "mocha --recursive --inspect-brk=0.0.0.0 bin/test --android",
     "test:debugger:ios": "mocha --recursive --inspect-brk=0.0.0.0 bin/test --ios",
-    "tslint": "tslint -c tslint.json test/**/*.ts"
+    "tslint": "tslint -c tslint.json test/**/*.ts",
+    "eslint": "eslint --quiet ."
   },
   "repository": {
     "type": "git",
