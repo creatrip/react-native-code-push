@@ -78,16 +78,80 @@ async function checkForUpdate(
             client_unique_id: config.clientUniqueId,
           };
 
-          // 커스텀 업데이트 체커 함수 호출
-          const response = await sharedCodePushOptions.updateChecker(
+          /**
+           * @type {ReleaseHistoryInterface}
+           */
+          const releaseHistory = await sharedCodePushOptions.updateChecker(
             updateRequest
           );
 
           /**
-           * CodePush SDK 내부 처리 로직에서 추출한 응답 처리
-           * 업데이트 시나리오별 분기 처리
+           * `runtimeVersion` (package.json 버전입니다)
+           * @type {string}
            */
-          const updateInfo = response.update_info;
+          const runtimeVersion = sharedCodePushOptions.runtimeVersion;
+
+          /**
+           * TODO 1: releaseHistory에서 최신 릴리스 찾기
+           * @return {ReleaseInfo}
+           */
+          function findLatestRelease(releaseHistory) {}
+
+          /**
+           * TODO 2: 업데이트가 필수인지 확인
+           * @return {boolean}
+           */
+          function checkIsMandatory(runtimeVersion, releaseHistory) {}
+
+          /**
+           * TODO 3: 롤백 여부를 결정하고 실행
+           * @return {boolean}
+           */
+          function shouldRollback(runtimeVersion, releaseHistory) {}
+
+          if (shouldRollback(runtimeVersion, releaseHistory)) {
+            // 롤백
+          }
+
+          // NOTE: example code
+          const update = findLatestRelease(releaseHistory);
+          const isMandatory = checkIsMandatory(runtimeVersion, update);
+
+          /**
+           * ReleaseHistoryInterface에서 결정된 업데이트 정보를
+           * 원본 CodePush 라이브러리 형식으로 변환
+           * @type {UpdateCheckResponse}
+           */
+          const updateInfo = {
+            /** 업데이트 파일 다운로드 URL */
+            download_url: update.downloadUrl,
+            /** 업데이트 사용 가능 여부 (이전 프로세스에서 `enabled`는 항상 true) */
+            is_available: update.enabled,
+            /** 업데이트 패키지 해시값 */
+            package_hash: update.packageHash,
+            /** 필수 업데이트 여부 */
+            is_mandatory: isMandatory,
+
+            /**
+             * 현재 실행 중인 바이너리 버전에 대해,
+             * 조회된 업데이트가 해당 바이너리를 타겟으로 하는지를 API 서버에서 판단하여,
+             * 타겟이 맞는 경우 현재 런타임 바이너리 버전을 그대로 반환함.
+             * 즉, updateChecker 결과가 존재한다면, 해당 업데이트는 현재 바이너리와 호환된다고 간주함.
+             */
+            target_binary_range: updateRequest.app_version,
+            /** CodePush 업데이트이므로 false 전달해야 정상 동작함 */
+            update_app_version: false,
+
+            /** 텔레메트리용 라벨 (현재는 텔레메트리 외에 유의미한 사용처 없음) */
+            label: runtimeVersion,
+            /** 업데이트 설명 (현재 미사용) */
+            description: "",
+
+            /** 런타임에서 사용하지 않는 필드들 */
+            is_disabled: false,
+            package_size: 0,
+            should_run_binary_version: false,
+          };
 
           // 케이스 1: 업데이트 정보가 없음
           if (!updateInfo) {
@@ -108,7 +172,6 @@ async function checkForUpdate(
           /**
            * 케이스 4: 정상적인 CodePush 업데이트
            * RemotePackage 타입 형식으로 변환 (CodePush SDK 내부 타입 참조)
-           * null 병합 연산자(??)로 기본값 처리
            */
           return {
             deploymentKey: config.deploymentKey,
@@ -717,7 +780,7 @@ let CodePush;
  * 커스텀 업데이트 확인 콜백 함수 타입 정의
  * @callback updateChecker
  * @param {UpdateCheckRequest} updateRequest - 업데이트를 확인할 현재 패키지 정보
- * @returns {Promise<{update_info: UpdateCheckResponse}>} 업데이트 확인 결과. AppCenter API 응답 인터페이스를 따릅니다.
+ * @returns {Promise<ReleaseHistoryInterface>} 특정 바이너리 버전에 배포된 업데이트들의 릴리스 히스토리입니다.
  */
 
 /**
@@ -726,6 +789,8 @@ let CodePush;
  * @type {Object}
  * @property {string|undefined} bundleHost - 업데이트 파일의 위치를 지정합니다. http 스키마와 호스트를 포함해야 합니다.
  * @property {Function} setBundleHost - bundleHost 값을 설정하는 함수
+ * @property {string} runtimeVersion - 런타임 버전
+ * @property {Function} setRuntimeVersion - runtimeVersion 값을 설정하는 함수
  * @property {updateChecker|undefined} updateChecker - 커스텀 업데이트 확인 함수
  * @property {Function} setUpdateChecker - updateChecker 값을 설정하는 함수
  * @property {boolean} fallbackToAppCenter - AppCenter로 폴백하는 옵션
@@ -733,6 +798,19 @@ let CodePush;
  */
 const sharedCodePushOptions = {
   bundleHost: undefined,
+  setBundleHost(host) {
+    if (host && typeof host !== "string")
+      throw new Error("pass a string to setBundleHost");
+    if (typeof host === "string" && host.slice(-1) !== "/") {
+      host += "/";
+    }
+    this.bundleHost = host;
+  },
+  runtimeVersion: undefined,
+  setRuntimeVersion(version) {
+    // TODO?: Semantic Version format validation
+    this.runtimeVersion = version;
+  },
   updateChecker: undefined,
   setUpdateChecker(updateCheckerFunction) {
     if (updateCheckerFunction && typeof updateCheckerFunction !== "function") {
@@ -771,6 +849,7 @@ function codePushify(options = {}) {
   }
 
   sharedCodePushOptions.setBundleHost(options.bundleHost);
+  sharedCodePushOptions.setRuntimeVersion(options.runtimeVersion);
   sharedCodePushOptions.setUpdateChecker(options.updateChecker);
   sharedCodePushOptions.setFallbackToAppCenter(options.fallbackToAppCenter);
 

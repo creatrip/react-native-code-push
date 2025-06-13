@@ -4,7 +4,7 @@ export type HandleBinaryVersionMismatchCallback = (
   update: RemotePackage
 ) => void;
 
-// from code-push SDK
+// CodePush SDK
 export interface UpdateCheckRequest {
   app_version: string /** 네이티브 앱 버전입니다. package.json 버전이 아닙니다. */;
   client_unique_id?: string;
@@ -14,7 +14,27 @@ export interface UpdateCheckRequest {
   package_hash?: string;
 }
 
-// from code-push SDK
+/**
+ * CodePush에서 배포된 업데이트 버전을 나타내는 문자열의 별칭입니다.
+ */
+type ReleaseVersion = string;
+
+/**
+ * `updateChecker` 함수가 반환해야 하는 릴리스 정보의 인터페이스입니다.
+ */
+export type ReleaseHistoryInterface = Record<ReleaseVersion, ReleaseInfo>;
+
+/**
+ * `updateChecker` 함수가 반환해야 하는 단일 배포 이력 항목을 나타내는 인터페이스입니다.
+ */
+export interface ReleaseInfo {
+  enabled: boolean;
+  mandatory: boolean;
+  downloadUrl: string;
+  packageHash: string;
+}
+
+// CodePush SDK
 export interface UpdateCheckResponse {
   download_url?: string;
   description?: string;
