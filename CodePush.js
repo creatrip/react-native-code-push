@@ -4,6 +4,7 @@ import requestFetchAdapter from "./request-fetch-adapter";
 import { AppState, Platform } from "react-native";
 import log from "./logging";
 import hoistStatics from "hoist-non-react-statics";
+import { SemverVersioning } from "./manual/SemverVersioning";
 
 let NativeCodePush = require("react-native").NativeModules.CodePush;
 const PackageMixins = require("./package-mixins")(NativeCodePush);
@@ -91,31 +92,16 @@ async function checkForUpdate(
            */
           const runtimeVersion = sharedCodePushOptions.runtimeVersion;
 
-          /**
-           * TODO 1: releaseHistory에서 최신 릴리스 찾기
-           * @return {ReleaseInfo}
-           */
-          function findLatestRelease(releaseHistory) {}
-
-          /**
-           * TODO 2: 업데이트가 필수인지 확인
-           * @return {boolean}
-           */
-          function checkIsMandatory(runtimeVersion, releaseHistory) {}
-
-          /**
-           * TODO 3: 롤백 여부를 결정하고 실행
-           * @return {boolean}
-           */
-          function shouldRollback(runtimeVersion, releaseHistory) {}
-
-          if (shouldRollback(runtimeVersion, releaseHistory)) {
-            // 롤백
-          }
-
-          // NOTE: example code
-          const update = findLatestRelease(releaseHistory);
-          const isMandatory = checkIsMandatory(runtimeVersion, update);
+          const [latestReleaseVersion, latestReleaseInfo] =
+            SemverVersioning.findLatestRelease(releaseHistory);
+          const isMandatory = SemverVersioning.checkIsMandatory(
+            runtimeVersion,
+            latestReleaseVersion
+          );
+          const shouldRollback = SemverVersioning.shouldRollback(
+            runtimeVersion,
+            releaseHistory
+          );
 
           /**
            * ReleaseHistoryInterface에서 결정된 업데이트 정보를
@@ -124,13 +110,13 @@ async function checkForUpdate(
            */
           const updateInfo = {
             /** 업데이트 파일 다운로드 URL */
-            download_url: update.downloadUrl,
+            download_url: latestReleaseInfo.downloadUrl,
             /** 업데이트 사용 가능 여부 (이전 프로세스에서 `enabled`는 항상 true) */
-            is_available: update.enabled,
+            is_available: latestReleaseInfo.enabled,
             /** 업데이트 패키지 해시값 */
-            package_hash: update.packageHash,
+            package_hash: latestReleaseInfo.packageHash,
             /** 필수 업데이트 여부 */
-            is_mandatory: isMandatory,
+            is_mandatory: isMandatory || shouldRollback,
 
             /**
              * 현재 실행 중인 바이너리 버전에 대해,
